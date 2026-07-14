@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Laser Sliders</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root {
+      --bg: #07111f;
+      --panel: #101b2e;
+      --panel-2: #13233b;
+      --border: #233553;
+      --text: #e8f1ff;
+      --muted: #8fa7c6;
+      --accent: #58f0ff;
+      --accent-2: #ffbf4d;
+      --laser: #ff5b8f;
+      --laser-glow: rgba(255, 91, 143, 0.4);
+      --mirror: #def6ff;
+      --crate: #8594ae;
+      --wall: #0a1322;
+      --floor: #15243d;
+      --target: #88ff8c;
+      --emitter: #ffd766;
+      --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        radial-gradient(circle at top, rgba(88, 240, 255, 0.12), transparent 30%),
+        linear-gradient(180deg, #08101c 0%, #04080f 100%);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      padding: 24px;
+    }
+
+    .shell {
+      width: min(1080px, 100%);
+      display: grid;
+      grid-template-columns: minmax(300px, 1.25fr) minmax(260px, 0.95fr);
+      gap: 22px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(19, 35, 59, 0.95), rgba(10, 18, 31, 0.98));
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .game-panel {
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .side-panel {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    h1, h2, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-shadow: 0 0 18px rgba(88, 240, 255, 0.45);
+    }
+
+    .subtitle, .copy, .footer {
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(143, 167, 198, 0.18);
+      border-radius: 16px;
+      padding: 14px 16px;
+    }
+
+    .card .label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.72rem;
+      margin-bottom: 6px;
+    }
+
+    .card strong {
+      font-size: 1.55rem;
+      display: block;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid rgba(88, 240, 255, 0.28);
+      border-radius: 999px;
+      background: rgba(88, 240, 255, 0.06);
+      color: var(--text);
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+    }
+
+    button:hover, button:focus-visible {
+      background: rgba(88, 240, 255, 0.14);
+      border-color: rgba(88, 240, 255, 0.48);
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px 18px;
+      align-items: center;
+    }
+
+    .status-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .status-copy h2 {
+      font-size: 1.4rem;
+    }
+
+    .status-copy p {
+      color: var(--muted);
+    }
+
+    .status-pill {
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(136, 255, 140, 0.26);
+      background: rgba(136, 255, 140, 0.08);
+      color: var(--target);
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+    }
+
+    .status-pill.pending {
+      color: var(--accent-2);
+      border-color: rgba(255, 191, 77, 0.2);
+      background: rgba(255, 191, 77, 0.08);
+    }
+
+    .board-wrap {
+      position: relative;
+      border-radius: 24px;
+      overflow: hidden;
+      border: 1px solid rgba(143, 167, 198, 0.18);
+      background: #08111d;
+      isolation: isolate;
+    }
+
+    #board {
+      position: relative;
+      display: grid;
+      gap: 0;
+      aspect-ratio: 1 / 1;
+      width: 100%;
+    }
+
+    #laser-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 3;
+    }
+
+    .cell {
+      position: relative;
+      border: 0;
+      padding: 0;
+      background: var(--floor);
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0;
+    }
+
+    .cell::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      pointer-events: none;
+    }
+
+    .cell.wall {
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent 45%),
+        var(--wall);
+    }
+
+    .cell.floor {
+      background:
+        radial-gradient(circle at 30% 25%, rgba(88, 240, 255, 0.08), transparent 38%),
+        var(--floor);
+    }
+
+    .cell.target::before,
+    .cell.emitter::before {
+      content: "";
+      position: absolute;
+      inset: 14%;
+      border-radius: 18px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .cell.target::before {
+      background: radial-gradient(circle, rgba(136, 255, 140, 0.25), transparent 68%);
+      box-shadow: inset 0 0 0 1px rgba(136, 255, 140, 0.36);
+    }
+
+    .cell.emitter::before {
+      background: radial-gradient(circle, rgba(255, 215, 102, 0.25), transparent 68%);
+      box-shadow: inset 0 0 0 1px rgba(255, 215, 102, 0.34);
+    }
+
+    .marker {
+      position: relative;
+      z-index: 1;
+      width: 66%;
+      height: 66%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 18px;
+      font-size: clamp(1.1rem, 3vw, 1.75rem);
+      font-weight: 800;
+      text-shadow: 0 0 16px rgba(255, 255, 255, 0.22);
+      pointer-events: none;
+    }
+
+    .marker.target {
+      color: var(--target);
+      border: 2px solid rgba(136, 255, 140, 0.45);
+      background: rgba(136, 255, 140, 0.08);
+    }
+
+    .marker.emitter {
+      color: var(--emitter);
+      border: 2px solid rgba(255, 215, 102, 0.45);
+      background: rgba(255, 215, 102, 0.08);
+    }
+
+    .tile {
+      position: relative;
+      z-index: 2;
+      width: 74%;
+      height: 74%;
+      border-radius: 20px;
+      display: grid;
+      place-items: center;
+      font-size: clamp(1.2rem, 3vw, 1.95rem);
+      font-weight: 900;
+      text-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 12px 26px rgba(0, 0, 0, 0.2);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    }
+
+    .tile.mirror {
+      color: #09111d;
+      background: linear-gradient(135deg, #f5fbff 0%, #93ddff 100%);
+      border: 2px solid rgba(255, 255, 255, 0.75);
+    }
+
+    .tile.crate {
+      color: #e6f0ff;
+      background: linear-gradient(135deg, #57657d 0%, #7886a2 100%);
+      border: 2px solid rgba(210, 224, 255, 0.26);
+    }
+
+    .cell.has-tile:not(.is-selected):hover .tile,
+    .cell.has-tile:focus-visible .tile {
+      transform: translateY(-1px);
+    }
+
+    .cell.is-selected .tile {
+      box-shadow: 0 0 0 4px rgba(88, 240, 255, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 16px 30px rgba(0, 0, 0, 0.28);
+      transform: translateY(-2px);
+    }
+
+    .cell.can-move {
+      cursor: pointer;
+    }
+
+    .cell.can-move::before {
+      content: "";
+      position: absolute;
+      inset: 18%;
+      border-radius: 18px;
+      border: 2px dashed rgba(88, 240, 255, 0.6);
+      background: rgba(88, 240, 255, 0.08);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .legend {
+      display: grid;
+      gap: 10px;
+    }
+
+    .legend-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+    }
+
+    .legend-chip {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      font-size: 1.1rem;
+    }
+
+    .legend-chip.mirror {
+      background: linear-gradient(135deg, #f5fbff 0%, #93ddff 100%);
+      color: #07111f;
+    }
+
+    .legend-chip.crate {
+      background: linear-gradient(135deg, #57657d 0%, #7886a2 100%);
+    }
+
+    .legend-chip.target {
+      background: rgba(136, 255, 140, 0.12);
+      border: 1px solid rgba(136, 255, 140, 0.35);
+      color: var(--target);
+    }
+
+    .footer {
+      font-size: 0.92rem;
+    }
+
+    @media (max-width: 940px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .side-panel {
+        order: -1;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .game-panel, .side-panel { padding: 18px; }
+      .hud { grid-template-columns: 1fr; }
+      .status { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="panel game-panel">
+      <div>
+        <h1>Laser Sliders</h1>
+        <p class="subtitle">Slide mirrors into place and ricochet the beam into the receiver.</p>
+      </div>
+
+      <div class="hud">
+        <div class="card">
+          <div class="label">Level</div>
+          <strong id="level-value">1 / 4</strong>
+        </div>
+        <div class="card">
+          <div class="label">Moves</div>
+          <strong id="moves-value">0</strong>
+        </div>
+        <div class="card">
+          <div class="label">Unlocked</div>
+          <strong id="unlocked-value">1</strong>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button id="prev-btn" type="button">Previous</button>
+        <button id="reset-btn" type="button">Reset</button>
+        <button id="next-btn" type="button">Next</button>
+      </div>
+
+      <div class="status">
+        <div class="status-copy">
+          <h2 id="level-name">Starter Bounce</h2>
+          <p id="level-hint">Bring the beam upward, then send it across to the target.</p>
+        </div>
+        <div id="status-pill" class="status-pill pending">Beam not aligned yet</div>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board" aria-label="Laser puzzle board"></div>
+        <svg id="laser-layer" viewBox="0 0 100 100" aria-hidden="true"></svg>
+      </div>
+    </section>
+
+    <aside class="panel side-panel">
+      <div class="copy">
+        Select a block, then click a highlighted square to slide it. Mirrors reflect the beam, while crates stop it cold.
+      </div>
+
+      <div class="legend">
+        <div class="legend-row">
+          <div class="legend-chip mirror">/</div>
+          <div>Slash mirror: turns right ↔ up and left ↔ down.</div>
+        </div>
+        <div class="legend-row">
+          <div class="legend-chip mirror">\</div>
+          <div>Backslash mirror: turns right ↔ down and left ↔ up.</div>
+        </div>
+        <div class="legend-row">
+          <div class="legend-chip crate">■</div>
+          <div>Crates are movable blockers that can shield or jam the beam.</div>
+        </div>
+        <div class="legend-row">
+          <div class="legend-chip target">◎</div>
+          <div>Hit the glowing receiver to clear the level and unlock the next one.</div>
+        </div>
+      </div>
+
+      <div class="copy">
+        Tip: use the live beam preview after every move. It is the fastest way to see whether a mirror is turning the laser the right way.
+      </div>
+
+      <div class="footer">
+        Pure HTML, CSS, and JavaScript — no dependencies, no build step.
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const CELL = 100;
+      const STORAGE_KEY = 'laser-sliders-unlocked';
+      const DIRS = {
+        up: { x: 0, y: -1, icon: '↑' },
+        down: { x: 0, y: 1, icon: '↓' },
+        left: { x: -1, y: 0, icon: '←' },
+        right: { x: 1, y: 0, icon: '→' },
+      };
+
+      const LEVELS = [
+        {
+          name: 'Starter Bounce',
+          hint: 'Bring the beam upward, then send it across to the target.',
+          layout: [
+            '#######',
+            '#....T#',
+            '#.....#',
+            '#>....#',
+            '#.....#',
+            '#.....#',
+            '#######',
+          ],
+          solvedTiles: [
+            { id: 'a', kind: 'back', x: 3, y: 3 },
+            { id: 'b', kind: 'slash', x: 3, y: 1 },
+            { id: 'c', kind: 'crate', x: 1, y: 1 },
+            { id: 'd', kind: 'crate', x: 5, y: 4 },
+          ],
+          scrambleSeed: 11,
+          scrambleSteps: 28,
+        },
+        {
+          name: 'Double Bank',
+          hint: 'Bounce up from the bottom row and hook the beam right at the top.',
+          layout: [
+            '########',
+            '#......#',
+            '#....T.#',
+            '#......#',
+            '#..##..#',
+            '#......#',
+            '#>.....#',
+            '########',
+          ],
+          solvedTiles: [
+            { id: 'a', kind: 'slash', x: 4, y: 6 },
+            { id: 'b', kind: 'slash', x: 4, y: 2 },
+            { id: 'c', kind: 'crate', x: 2, y: 3 },
+            { id: 'd', kind: 'crate', x: 6, y: 5 },
+            { id: 'e', kind: 'back', x: 2, y: 5 },
+          ],
+          scrambleSeed: 29,
+          scrambleSteps: 44,
+        },
+        {
+          name: 'Wall Runner',
+          hint: 'Lift the beam beside the wall cluster, then redirect it into the top lane.',
+          layout: [
+            '#########',
+            '#....T..#',
+            '#.......#',
+            '#..###..#',
+            '#.......#',
+            '#.......#',
+            '#>......#',
+            '#########',
+          ],
+          solvedTiles: [
+            { id: 'a', kind: 'back', x: 4, y: 6 },
+            { id: 'b', kind: 'slash', x: 4, y: 1 },
+            { id: 'c', kind: 'crate', x: 2, y: 1 },
+            { id: 'd', kind: 'crate', x: 6, y: 4 },
+            { id: 'e', kind: 'slash', x: 1, y: 5 },
+            { id: 'f', kind: 'back', x: 7, y: 2 },
+          ],
+          scrambleSeed: 47,
+          scrambleSteps: 58,
+        },
+        {
+          name: 'Three Cushion Shot',
+          hint: 'Thread the beam through three mirror turns to reach the lower receiver.',
+          layout: [
+            '#########',
+            '#>......#',
+            '#.......#',
+            '#..#....#',
+            '#..#....#',
+            '#.......#',
+            '#.......#',
+            '#.T.....#',
+            '#########',
+          ],
+          solvedTiles: [
+            { id: 'a', kind: 'back', x: 4, y: 1 },
+            { id: 'b', kind: 'slash', x: 4, y: 5 },
+            { id: 'c', kind: 'slash', x: 2, y: 5 },
+            { id: 'd', kind: 'crate', x: 6, y: 1 },
+            { id: 'e', kind: 'crate', x: 6, y: 6 },
+            { id: 'f', kind: 'back', x: 1, y: 3 },
+          ],
+          scrambleSeed: 73,
+          scrambleSteps: 72,
+        },
+      ];
+
+      const boardEl = document.getElementById('board');
+      const laserLayer = document.getElementById('laser-layer');
+      const levelValueEl = document.getElementById('level-value');
+      const movesValueEl = document.getElementById('moves-value');
+      const unlockedValueEl = document.getElementById('unlocked-value');
+      const levelNameEl = document.getElementById('level-name');
+      const levelHintEl = document.getElementById('level-hint');
+      const statusPillEl = document.getElementById('status-pill');
+      const prevBtn = document.getElementById('prev-btn');
+      const nextBtn = document.getElementById('next-btn');
+      const resetBtn = document.getElementById('reset-btn');
+
+      let currentLevelIndex = 0;
+      let unlockedLevelCount = loadUnlockedLevelCount();
+      let tiles = [];
+      let startTiles = [];
+      let selectedTileId = null;
+      let moves = 0;
+      let solved = false;
+
+      function loadUnlockedLevelCount() {
+        try {
+          const raw = Number.parseInt(localStorage.getItem(STORAGE_KEY) || '1', 10);
+          return Number.isFinite(raw) ? clamp(raw, 1, LEVELS.length) : 1;
+        } catch {
+          return 1;
+        }
+      }
+
+      function saveUnlockedLevelCount(count) {
+        try {
+          localStorage.setItem(STORAGE_KEY, String(clamp(count, 1, LEVELS.length)));
+        } catch {}
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function deepCloneTiles(source) {
+        return source.map(tile => ({ ...tile }));
+      }
+
+      function currentLevel() {
+        return LEVELS[currentLevelIndex];
+      }
+
+      function parseLayout(level) {
+        const grid = level.layout.map(row => row.split(''));
+        const height = grid.length;
+        const width = grid[0].length;
+        let emitter = null;
+        let target = null;
+        const walls = new Set();
+        const blocked = new Set();
+
+        grid.forEach((row, y) => {
+          row.forEach((cell, x) => {
+            if (cell === '#') {
+              walls.add(key(x, y));
+            } else if (cell === 'T') {
+              target = { x, y };
+              blocked.add(key(x, y));
+            } else if (DIR_FROM_SYMBOL[cell]) {
+              emitter = { x, y, dir: DIR_FROM_SYMBOL[cell] };
+              blocked.add(key(x, y));
+            }
+          });
+        });
+
+        return { width, height, grid, walls, emitter, target, blocked };
+      }
+
+      const DIR_FROM_SYMBOL = {
+        '^': 'up',
+        'v': 'down',
+        '<': 'left',
+        '>': 'right',
+      };
+
+      function key(x, y) {
+        return `${x},${y}`;
+      }
+
+      function makeRng(seed) {
+        let state = seed >>> 0;
+        return function () {
+          state = (state * 1664525 + 1013904223) >>> 0;
+          return state / 4294967296;
+        };
+      }
+
+      function getTileMap(tileList) {
+        const map = new Map();
+        tileList.forEach(tile => {
+          map.set(key(tile.x, tile.y), tile);
+        });
+        return map;
+      }
+
+      function inBounds(meta, x, y) {
+        return x >= 0 && y >= 0 && x < meta.width && y < meta.height;
+      }
+
+      function isWalkable(meta, x, y) {
+        return inBounds(meta, x, y) && !meta.walls.has(key(x, y)) && !meta.blocked.has(key(x, y));
+      }
+
+      function legalMovesForTile(meta, tile, tileMap) {
+        return Object.values(DIRS)
+          .map(dir => ({ x: tile.x + dir.x, y: tile.y + dir.y }))
+          .filter(pos => isWalkable(meta, pos.x, pos.y) && !tileMap.has(key(pos.x, pos.y)));
+      }
+
+      function scrambleLevel(level) {
+        const meta = parseLayout(level);
+        const tileList = deepCloneTiles(level.solvedTiles);
+        const rng = makeRng(level.scrambleSeed);
+        let previous = null;
+
+        for (let step = 0; step < level.scrambleSteps; step++) {
+          const tileMap = getTileMap(tileList);
+          const options = [];
+
+          tileList.forEach(tile => {
+            legalMovesForTile(meta, tile, tileMap).forEach(pos => {
+              options.push({
+                tile,
+                x: pos.x,
+                y: pos.y,
+                reverse: previous && previous.id === tile.id && previous.fromX === pos.x && previous.fromY === pos.y,
+              });
+            });
+          });
+
+          const pool = options.some(option => !option.reverse)
+            ? options.filter(option => !option.reverse)
+            : options;
+
+          if (!pool.length) break;
+
+          const choice = pool[Math.floor(rng() * pool.length)];
+          previous = {
+            id: choice.tile.id,
+            fromX: choice.tile.x,
+            fromY: choice.tile.y,
+          };
+          choice.tile.x = choice.x;
+          choice.tile.y = choice.y;
+        }
+
+        let trace = traceLaser(meta, tileList);
+        let safety = 0;
+        while (trace.hitTarget && safety < 24) {
+          safety++;
+          const tileMap = getTileMap(tileList);
+          const candidates = [];
+          tileList.forEach(tile => {
+            legalMovesForTile(meta, tile, tileMap).forEach(pos => {
+              candidates.push({ tile, x: pos.x, y: pos.y });
+            });
+          });
+          if (!candidates.length) break;
+          const choice = candidates[Math.floor(rng() * candidates.length)];
+          choice.tile.x = choice.x;
+          choice.tile.y = choice.y;
+          trace = traceLaser(meta, tileList);
+        }
+
+        return tileList;
+      }
+
+      function resetLevel(index) {
+        currentLevelIndex = index;
+        selectedTileId = null;
+        moves = 0;
+        solved = false;
+        startTiles = scrambleLevel(currentLevel());
+        tiles = deepCloneTiles(startTiles);
+        render();
+      }
+
+      function setLevel(index) {
+        resetLevel(clamp(index, 0, LEVELS.length - 1));
+      }
+
+      function restartCurrentLevel() {
+        selectedTileId = null;
+        moves = 0;
+        solved = false;
+        tiles = deepCloneTiles(startTiles);
+        render();
+      }
+
+      function reflect(kind, dirName) {
+        if (kind === 'slash') {
+          return {
+            up: 'right',
+            right: 'up',
+            down: 'left',
+            left: 'down',
+          }[dirName];
+        }
+
+        return {
+          up: 'left',
+          left: 'up',
+          down: 'right',
+          right: 'down',
+        }[dirName];
+      }
+
+      function centerOf(x, y) {
+        return {
+          x: x * CELL + CELL / 2,
+          y: y * CELL + CELL / 2,
+        };
+      }
+
+      function edgeOf(pos, dirName) {
+        const center = centerOf(pos.x, pos.y);
+        if (dirName === 'up') return { x: center.x, y: center.y - CELL / 2 };
+        if (dirName === 'down') return { x: center.x, y: center.y + CELL / 2 };
+        if (dirName === 'left') return { x: center.x - CELL / 2, y: center.y };
+        return { x: center.x + CELL / 2, y: center.y };
+      }
+
+      function traceLaser(meta, tileList) {
+        const tileMap = getTileMap(tileList);
+        const points = [centerOf(meta.emitter.x, meta.emitter.y)];
+        const visited = new Set();
+        let dirName = meta.emitter.dir;
+        let pos = { x: meta.emitter.x, y: meta.emitter.y };
+        let hitTarget = false;
+        let stoppedOn = 'edge';
+
+        for (let step = 0; step < meta.width * meta.height * 8; step++) {
+          const dir = DIRS[dirName];
+          const next = { x: pos.x + dir.x, y: pos.y + dir.y };
+
+          if (!inBounds(meta, next.x, next.y) || meta.walls.has(key(next.x, next.y))) {
+            points.push(edgeOf(pos, dirName));
+            stoppedOn = 'wall';
+            break;
+          }
+
+          const nextKey = key(next.x, next.y);
+          if (next.x === meta.target.x && next.y === meta.target.y) {
+            points.push(centerOf(next.x, next.y));
+            hitTarget = true;
+            stoppedOn = 'target';
+            break;
+          }
+
+          const tile = tileMap.get(nextKey);
+          if (!tile) {
+            points.push(centerOf(next.x, next.y));
+            pos = next;
+            continue;
+          }
+
+          points.push(centerOf(next.x, next.y));
+          if (tile.kind === 'crate') {
+            stoppedOn = 'crate';
+            break;
+          }
+
+          const stateKey = `${next.x},${next.y},${dirName},${tile.kind}`;
+          if (visited.has(stateKey)) {
+            stoppedOn = 'loop';
+            break;
+          }
+          visited.add(stateKey);
+          dirName = reflect(tile.kind, dirName);
+          pos = next;
+        }
+
+        return { points, hitTarget, stoppedOn };
+      }
+
+      function moveSelectedTileTo(x, y) {
+        const meta = parseLayout(currentLevel());
+        const tileMap = getTileMap(tiles);
+        const tile = tiles.find(candidate => candidate.id === selectedTileId);
+        if (!tile) return;
+        const allowed = legalMovesForTile(meta, tile, tileMap).some(pos => pos.x === x && pos.y === y);
+        if (!allowed) return;
+
+        tile.x = x;
+        tile.y = y;
+        selectedTileId = tile.id;
+        moves++;
+
+        const trace = traceLaser(meta, tiles);
+        if (trace.hitTarget && !solved) {
+          solved = true;
+          unlockedLevelCount = Math.max(unlockedLevelCount, Math.min(LEVELS.length, currentLevelIndex + 2));
+          saveUnlockedLevelCount(unlockedLevelCount);
+        }
+
+        render();
+      }
+
+      function render() {
+        const level = currentLevel();
+        const meta = parseLayout(level);
+        const tileMap = getTileMap(tiles);
+        const selectedTile = tiles.find(tile => tile.id === selectedTileId) || null;
+        const movableTargets = selectedTile ? legalMovesForTile(meta, selectedTile, tileMap) : [];
+        const targetKeys = new Set(movableTargets.map(pos => key(pos.x, pos.y)));
+        const trace = traceLaser(meta, tiles);
+        solved = trace.hitTarget;
+
+        boardEl.innerHTML = '';
+        boardEl.style.gridTemplateColumns = `repeat(${meta.width}, minmax(0, 1fr))`;
+        boardEl.style.aspectRatio = `${meta.width} / ${meta.height}`;
+
+        for (let y = 0; y < meta.height; y++) {
+          for (let x = 0; x < meta.width; x++) {
+            const cellType = meta.grid[y][x];
+            const tile = tileMap.get(key(x, y));
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'cell';
+            button.dataset.x = String(x);
+            button.dataset.y = String(y);
+
+            if (cellType === '#') {
+              button.classList.add('wall');
+              button.disabled = true;
+            } else {
+              button.classList.add('floor');
+            }
+
+            if (DIR_FROM_SYMBOL[cellType]) {
+              button.classList.add('emitter');
+              const marker = document.createElement('div');
+              marker.className = 'marker emitter';
+              marker.textContent = DIRS[DIR_FROM_SYMBOL[cellType]].icon;
+              button.appendChild(marker);
+              button.setAttribute('aria-label', 'Laser emitter');
+            } else if (cellType === 'T') {
+              button.classList.add('target');
+              const marker = document.createElement('div');
+              marker.className = 'marker target';
+              marker.textContent = '◎';
+              button.appendChild(marker);
+              button.setAttribute('aria-label', 'Laser target');
+            }
+
+            if (tile) {
+              button.classList.add('has-tile');
+              if (selectedTileId === tile.id) button.classList.add('is-selected');
+              const tileEl = document.createElement('div');
+              tileEl.className = `tile ${tile.kind === 'crate' ? 'crate' : 'mirror'}`;
+              tileEl.textContent = tile.kind === 'slash' ? '/' : tile.kind === 'back' ? '\\' : '■';
+              button.appendChild(tileEl);
+              button.setAttribute('aria-label', `${tile.kind} block`);
+            }
+
+            if (targetKeys.has(key(x, y))) {
+              button.classList.add('can-move');
+            }
+
+            boardEl.appendChild(button);
+          }
+        }
+
+        levelValueEl.textContent = `${currentLevelIndex + 1} / ${LEVELS.length}`;
+        movesValueEl.textContent = String(moves);
+        unlockedValueEl.textContent = `${unlockedLevelCount}`;
+        levelNameEl.textContent = level.name;
+        levelHintEl.textContent = level.hint;
+        statusPillEl.textContent = solved
+          ? currentLevelIndex === LEVELS.length - 1
+            ? 'All levels cleared'
+            : 'Receiver hit — next level unlocked'
+          : trace.stoppedOn === 'crate'
+            ? 'Beam blocked by a crate'
+            : trace.stoppedOn === 'loop'
+              ? 'Beam is trapped in a loop'
+              : 'Beam not aligned yet';
+        statusPillEl.className = `status-pill ${solved ? '' : 'pending'}`.trim();
+
+        prevBtn.disabled = currentLevelIndex === 0;
+        nextBtn.disabled = currentLevelIndex >= unlockedLevelCount - 1 || currentLevelIndex === LEVELS.length - 1;
+
+        renderLaser(meta, trace);
+      }
+
+      function renderLaser(meta, trace) {
+        const width = meta.width * CELL;
+        const height = meta.height * CELL;
+        laserLayer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        laserLayer.innerHTML = '';
+
+        const linePoints = trace.points.map(point => `${point.x},${point.y}`).join(' ');
+        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        glow.setAttribute('points', linePoints);
+        glow.setAttribute('fill', 'none');
+        glow.setAttribute('stroke', 'rgba(255, 91, 143, 0.3)');
+        glow.setAttribute('stroke-width', '18');
+        glow.setAttribute('stroke-linecap', 'round');
+        glow.setAttribute('stroke-linejoin', 'round');
+        laserLayer.appendChild(glow);
+
+        const core = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        core.setAttribute('points', linePoints);
+        core.setAttribute('fill', 'none');
+        core.setAttribute('stroke', '#ff5b8f');
+        core.setAttribute('stroke-width', '6');
+        core.setAttribute('stroke-linecap', 'round');
+        core.setAttribute('stroke-linejoin', 'round');
+        core.setAttribute('stroke-dasharray', '1 0');
+        laserLayer.appendChild(core);
+
+        trace.points.slice(1, -1).forEach(point => {
+          const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          dot.setAttribute('cx', point.x);
+          dot.setAttribute('cy', point.y);
+          dot.setAttribute('r', '5');
+          dot.setAttribute('fill', '#ffd7e6');
+          laserLayer.appendChild(dot);
+        });
+
+        const endpoint = trace.points[trace.points.length - 1];
+        if (endpoint) {
+          const pulse = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          pulse.setAttribute('cx', endpoint.x);
+          pulse.setAttribute('cy', endpoint.y);
+          pulse.setAttribute('r', trace.hitTarget ? '18' : '12');
+          pulse.setAttribute('fill', trace.hitTarget ? 'rgba(136, 255, 140, 0.35)' : 'rgba(255, 91, 143, 0.25)');
+          laserLayer.appendChild(pulse);
+        }
+      }
+
+      function handleBoardClick(event) {
+        const cell = event.target.closest('.cell');
+        if (!cell) return;
+
+        const x = Number.parseInt(cell.dataset.x, 10);
+        const y = Number.parseInt(cell.dataset.y, 10);
+        const tile = tiles.find(candidate => candidate.x === x && candidate.y === y) || null;
+
+        if (tile) {
+          selectedTileId = tile.id;
+          render();
+          return;
+        }
+
+        if (selectedTileId && cell.classList.contains('can-move')) {
+          moveSelectedTileTo(x, y);
+          return;
+        }
+
+        selectedTileId = null;
+        render();
+      }
+
+      function handleKeydown(event) {
+        if (!selectedTileId) return;
+
+        const directionByKey = {
+          ArrowUp: 'up',
+          ArrowDown: 'down',
+          ArrowLeft: 'left',
+          ArrowRight: 'right',
+        };
+        const dirName = directionByKey[event.key];
+        if (!dirName) return;
+
+        const tile = tiles.find(candidate => candidate.id === selectedTileId);
+        if (!tile) return;
+
+        event.preventDefault();
+        moveSelectedTileTo(tile.x + DIRS[dirName].x, tile.y + DIRS[dirName].y);
+      }
+
+      boardEl.addEventListener('click', handleBoardClick);
+      document.addEventListener('keydown', handleKeydown);
+      prevBtn.addEventListener('click', () => {
+        if (currentLevelIndex > 0) setLevel(currentLevelIndex - 1);
+      });
+      nextBtn.addEventListener('click', () => {
+        if (currentLevelIndex < unlockedLevelCount - 1 && currentLevelIndex < LEVELS.length - 1) {
+          setLevel(currentLevelIndex + 1);
+        }
+      });
+      resetBtn.addEventListener('click', restartCurrentLevel);
+
+      setLevel(0);
+    }());
+  </script>
+</body>
+</html>
