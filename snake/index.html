@@ -16,7 +16,6 @@
       --food:      #ff3c5f;
       --text:      #e0e0e0;
       --muted:     #666;
-      --cell:      28;        /* visual reference only — keep in sync with CELL in JS */
       --cols:      20;
       --rows:      20;
     }
@@ -189,16 +188,19 @@
   'use strict';
 
   // ─── Constants ───────────────────────────────────────────────────────────────
-  const COLS       = 20;
-  const ROWS       = 20;
-  const CELL       = 28;          // pixels per cell
-  const W          = COLS * CELL;
-  const H          = ROWS * CELL;
+  const COLS            = 20;
+  const ROWS            = 20;
+  const CELL            = 28;          // pixels per cell
+  const W               = COLS * CELL;
+  const H               = ROWS * CELL;
+  const TWO_PI          = Math.PI * 2;
+  const SEGMENT_RADIUS  = 4;           // rounded corner radius for snake segments
+  const MIN_SWIPE_PX    = 10;          // minimum swipe distance to register
 
-  // Speed table: [level] -> ms between ticks
-  // Level 1 = 180 ms, increases every 5 points, caps at level 10 (55 ms)
+  // Speed table: index 0 = level 1 (180 ms/tick), capped at MAX_LEVEL (55 ms/tick)
   const SPEED      = [180, 165, 150, 135, 120, 108, 95, 83, 72, 62, 55];
-  const LEVEL_STEP = 5;           // points per level
+  const MAX_LEVEL  = SPEED.length - 1; // highest level index (10 → level display 10)
+  const LEVEL_STEP = 5;                // score points earned per level
 
   // Colours (match CSS custom properties for a coherent look)
   const C = {
@@ -299,10 +301,10 @@
     if (ate) {
       score++;
       if (score > best) { best = score; saveBest(best); }
-      const newLevel = Math.min(Math.floor(score / LEVEL_STEP) + 1, SPEED.length);
+      const newLevel = Math.min(Math.floor(score / LEVEL_STEP) + 1, MAX_LEVEL);
       if (newLevel !== level) {
         level  = newLevel;
-        tickMs = SPEED[Math.min(level - 1, SPEED.length - 1)];
+        tickMs = SPEED[level - 1];
       }
       spawnFood();
       updateHUD();
@@ -371,7 +373,7 @@
 
     // Food — pulsing glow
     if (food) {
-      const pulse = 0.6 + 0.4 * Math.sin(foodAnim / 60 * Math.PI * 2);
+      const pulse = 0.6 + 0.4 * Math.sin(foodAnim / 60 * TWO_PI);
       const cx    = food.x * CELL + CELL / 2;
       const cy    = food.y * CELL + CELL / 2;
       const r     = CELL / 2 * 0.72 * pulse;
@@ -381,13 +383,13 @@
       grad.addColorStop(0, C.foodGlow);
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(cx, cy, CELL, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, CELL, 0, TWO_PI); ctx.fill();
 
       // dot
       ctx.fillStyle = C.food;
       ctx.shadowColor = C.food;
       ctx.shadowBlur  = 10;
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, TWO_PI); ctx.fill();
       ctx.shadowBlur  = 0;
     }
 
@@ -417,18 +419,18 @@
       ctx.beginPath();
       // roundRect with arc fallback for older browsers
       if (ctx.roundRect) {
-        ctx.roundRect(x + pad, y + pad, sz, sz, 4);
+        ctx.roundRect(x + pad, y + pad, sz, sz, SEGMENT_RADIUS);
       } else {
-        const r2 = 4, rx = x + pad, ry = y + pad;
-        ctx.moveTo(rx + r2, ry);
-        ctx.lineTo(rx + sz - r2, ry);
-        ctx.arcTo(rx + sz, ry, rx + sz, ry + r2, r2);
-        ctx.lineTo(rx + sz, ry + sz - r2);
-        ctx.arcTo(rx + sz, ry + sz, rx + sz - r2, ry + sz, r2);
-        ctx.lineTo(rx + r2, ry + sz);
-        ctx.arcTo(rx, ry + sz, rx, ry + sz - r2, r2);
-        ctx.lineTo(rx, ry + r2);
-        ctx.arcTo(rx, ry, rx + r2, ry, r2);
+        const rx = x + pad, ry = y + pad;
+        ctx.moveTo(rx + SEGMENT_RADIUS, ry);
+        ctx.lineTo(rx + sz - SEGMENT_RADIUS, ry);
+        ctx.arcTo(rx + sz, ry, rx + sz, ry + SEGMENT_RADIUS, SEGMENT_RADIUS);
+        ctx.lineTo(rx + sz, ry + sz - SEGMENT_RADIUS);
+        ctx.arcTo(rx + sz, ry + sz, rx + sz - SEGMENT_RADIUS, ry + sz, SEGMENT_RADIUS);
+        ctx.lineTo(rx + SEGMENT_RADIUS, ry + sz);
+        ctx.arcTo(rx, ry + sz, rx, ry + sz - SEGMENT_RADIUS, SEGMENT_RADIUS);
+        ctx.lineTo(rx, ry + SEGMENT_RADIUS);
+        ctx.arcTo(rx, ry, rx + SEGMENT_RADIUS, ry, SEGMENT_RADIUS);
         ctx.closePath();
       }
       ctx.fill();
@@ -535,7 +537,7 @@
     const dx = e.changedTouches[0].clientX - touchStart.x;
     const dy = e.changedTouches[0].clientY - touchStart.y;
     touchStart = null;
-    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+    if (Math.abs(dx) < MIN_SWIPE_PX && Math.abs(dy) < MIN_SWIPE_PX) return;
     let swipeDir;
     if (Math.abs(dx) > Math.abs(dy)) {
       swipeDir = dx > 0 ? DIR.RIGHT : DIR.LEFT;
@@ -543,8 +545,8 @@
       swipeDir = dy > 0 ? DIR.DOWN : DIR.UP;
     }
     if (state === 'idle' || state === 'dead') {
+      // Start first; init() resets dir to RIGHT, then apply swipe if not a reversal
       startGame();
-      // Apply the swipe direction as the initial direction (avoid reversing default RIGHT start)
       if (!isOpposite(swipeDir, dir)) nextDir = swipeDir;
       return;
     }
