@@ -451,11 +451,11 @@
       <div class="legend">
         <div class="legend-row">
           <div class="legend-chip mirror">/</div>
-          <div>Slash mirror: turns right ↔ up and left ↔ down.</div>
+          <div>Slash mirror: reflects right to up, up to right, left to down, and down to left.</div>
         </div>
         <div class="legend-row">
           <div class="legend-chip mirror">\</div>
-          <div>Backslash mirror: turns right ↔ down and left ↔ up.</div>
+          <div>Backslash mirror: reflects right to down, down to right, left to up, and up to left.</div>
         </div>
         <div class="legend-row">
           <div class="legend-chip crate">■</div>
@@ -622,7 +622,7 @@
       }
 
       function clamp(value, min, max) {
-        return Math.max(min, Math.min(max, value));
+        return Math.min(max, Math.max(min, value));
       }
 
       function deepCloneTiles(source) {
