@@ -16,7 +16,7 @@
       --food:      #ff3c5f;
       --text:      #e0e0e0;
       --muted:     #666;
-      --cell:      28;        /* logical grid cell size — also set in JS */
+      --cell:      28;        /* visual reference only — keep in sync with CELL in JS */
       --cols:      20;
       --rows:      20;
     }
@@ -196,7 +196,7 @@
   const H          = ROWS * CELL;
 
   // Speed table: [level] -> ms between ticks
-  // Level 1 = 180 ms, increases every 5 points, caps at level 10 (70 ms)
+  // Level 1 = 180 ms, increases every 5 points, caps at level 10 (55 ms)
   const SPEED      = [180, 165, 150, 135, 120, 108, 95, 83, 72, 62, 55];
   const LEVEL_STEP = 5;           // points per level
 
@@ -359,15 +359,15 @@
     ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, W, H);
 
-    // Grid lines (subtle)
+    // Grid lines (subtle) — batched into two paths for performance
     ctx.strokeStyle = C.grid;
     ctx.lineWidth   = 0.5;
-    for (let c = 0; c <= COLS; c++) {
-      ctx.beginPath(); ctx.moveTo(c * CELL, 0); ctx.lineTo(c * CELL, H); ctx.stroke();
-    }
-    for (let r = 0; r <= ROWS; r++) {
-      ctx.beginPath(); ctx.moveTo(0, r * CELL); ctx.lineTo(W, r * CELL); ctx.stroke();
-    }
+    ctx.beginPath();
+    for (let c = 0; c <= COLS; c++) { ctx.moveTo(c * CELL, 0); ctx.lineTo(c * CELL, H); }
+    ctx.stroke();
+    ctx.beginPath();
+    for (let r = 0; r <= ROWS; r++) { ctx.moveTo(0, r * CELL); ctx.lineTo(W, r * CELL); }
+    ctx.stroke();
 
     // Food — pulsing glow
     if (food) {
@@ -415,7 +415,22 @@
 
       ctx.fillStyle = colour;
       ctx.beginPath();
-      ctx.roundRect(x + pad, y + pad, sz, sz, 4);
+      // roundRect with arc fallback for older browsers
+      if (ctx.roundRect) {
+        ctx.roundRect(x + pad, y + pad, sz, sz, 4);
+      } else {
+        const r2 = 4, rx = x + pad, ry = y + pad;
+        ctx.moveTo(rx + r2, ry);
+        ctx.lineTo(rx + sz - r2, ry);
+        ctx.arcTo(rx + sz, ry, rx + sz, ry + r2, r2);
+        ctx.lineTo(rx + sz, ry + sz - r2);
+        ctx.arcTo(rx + sz, ry + sz, rx + sz - r2, ry + sz, r2);
+        ctx.lineTo(rx + r2, ry + sz);
+        ctx.arcTo(rx, ry + sz, rx, ry + sz - r2, r2);
+        ctx.lineTo(rx, ry + r2);
+        ctx.arcTo(rx, ry, rx + r2, ry, r2);
+        ctx.closePath();
+      }
       ctx.fill();
       ctx.shadowBlur = 0;
     });
@@ -527,7 +542,12 @@
     } else {
       swipeDir = dy > 0 ? DIR.DOWN : DIR.UP;
     }
-    if (state === 'idle' || state === 'dead') { startGame(); return; }
+    if (state === 'idle' || state === 'dead') {
+      startGame();
+      // Apply the swipe direction as the initial direction (avoid reversing default RIGHT start)
+      if (!isOpposite(swipeDir, dir)) nextDir = swipeDir;
+      return;
+    }
     if (state === 'running' && !isOpposite(swipeDir, dir)) nextDir = swipeDir;
   }, { passive: true });
 
